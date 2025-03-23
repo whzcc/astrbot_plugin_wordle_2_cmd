@@ -275,7 +275,7 @@ class PluginWordle(Star):
         """结束游戏"""
         session_id = event.unified_msg_origin
         if session_id not in self.game_sessions:
-            yield event.plain_result("游戏还没开始，输入“/猜单词”来开始游戏吧！")
+            yield event.plain_result("游戏还没开始，输入“/猜单词 开始”来开始游戏吧！")
             return
         if session_id in self.game_sessions:
             game = self.game_sessions[session_id]
@@ -287,7 +287,7 @@ class PluginWordle(Star):
         """获取提示"""
         session_id = event.unified_msg_origin
         if session_id not in self.game_sessions:
-            yield event.plain_result("游戏还没开始，输入“/猜单词”来开始游戏吧！")
+            yield event.plain_result("游戏还没开始，输入“/猜单词 开始”来开始游戏吧！")
             return
         game = self.game_sessions[session_id]
 
