@@ -223,10 +223,16 @@ class WordleGame:
     "2.2.1",
     "https://github.com/whzcc/astrbot_plugin_wordle_2_cmd",
 )
+
 class PluginWordle(Star):
-    def __init__(self, context: Context):
+    def __init__(self, context: Context, config: dict):
         super().__init__(context)
         self.game_sessions: dict[str, WordleGame] = {}
+        # 加载配置文件
+        self.config = config
+        
+        # 自定义拼写检查
+        self.custom_word_list = self.config.get("custom_word_list", "").split(";")
 
     @staticmethod
     async def get_answer(length):
