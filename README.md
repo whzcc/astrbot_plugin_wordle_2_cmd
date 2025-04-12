@@ -2,6 +2,8 @@
 
 Forked from [astrbot_plugin_wordle](https://github.com/Raven95676/astrbot_plugin_wordle)
 
+2.2.1：支持配置自定义拼写检查（支持正则表达式）
+
 > [!important]
 > 这个版本响应聊天中的指令。
 > 
