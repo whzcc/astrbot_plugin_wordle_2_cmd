@@ -231,7 +231,7 @@ class WordleGame:
     "astrbot_plugin_wordle_2_cmd",
     "Raven95676, whzc",
     "Wordle游戏（响应指令内容版），支持指定位数",
-    "2.2.1",
+    "2.2.2",
     "https://github.com/whzcc/astrbot_plugin_wordle_2_cmd",
 )
 
