@@ -28,7 +28,7 @@ def re_spell_check(word: str, re_word_list: list):  # 支持正则表达式的�
     for each_word in re_word_list:
         if re.search(f'{each_word}',word):
             return True
-        
+            
 class WordleGame:
     def __init__(self, answer: str, word_dict: dict, explanation: str):
         self.answer = answer.upper()
