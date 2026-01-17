@@ -19,23 +19,29 @@ except:
 from spellchecker import SpellChecker
 
 def re_spell_check(word: str, re_word_list: list):  # 支持正则表达式的自定义单词检查
+    if (
+        not re_word_list 
+        or len(re_word_list) == 0 
+        or (re_word_list[0] == "" and len(re_word_list) == 1)
+        ):
+        return
     for each_word in re_word_list:
         if re.search(f'{each_word}',word):
             return True
         
 class WordleGame:
-    def __init__(self, answer: str):
+    def __init__(self, answer: str, word_dict: dict, explanation: str):
         self.answer = answer.upper()
+        self.word_dict = word_dict
+        self.explanation = explanation
         self.length = len(answer)
         self.max_attempts = self.length + 1
         self.guesses: list[str] = []
         self.feedbacks: list[list[int]] = []
         self.history_letters: list[str] = []
         self.history_words: list[str] = []
-
         self.plugin_dir = os.path.dirname(os.path.abspath(__file__))  # 获取当前文件所在目录
         self.font_file = os.path.join(self.plugin_dir, "MinecraftAE.ttf")   # 这里可以修改字体为自定义字体
-
         self._font = ImageFont.truetype(self.font_file, 40)  #设定字体、字号、字重
 
     async def gen_image(self) -> bytes:
@@ -184,7 +190,7 @@ class WordleGame:
 
         return result
     
-    async def hint(self) -> bytes:   # 原理和guess()相同，但本函数无需传参
+    async def hint(self):   # 原理和guess()相同，但本函数无需传参
         tem = 0
         for i in range(len(self.answer)):
             if self.answer[i] in self.history_letters:
@@ -241,18 +247,17 @@ class PluginWordle(Star):
 
     @staticmethod
     async def get_answer(length):
+        '''从词表文件中选择一个词作为一道题的答案，返回值还包括了单词释义，以及词表文件中长度相同的所有其他词（用于拼写检查）'''
         try:
             wordlist_path = os.path.join(
                 os.path.dirname(os.path.abspath(__file__)), "wordlist"
             )
-
             if not os.path.exists(wordlist_path):
                 logger.error("词表文件不存在")
                 return None
 
             # 获取单词文件
             word_file_list = os.listdir(wordlist_path)
-            global word_dict
             word_dict = {}
             # 遍历单词表，并用字典接收内容
             for word_file in word_file_list:
@@ -262,110 +267,107 @@ class PluginWordle(Star):
                     for word in list(word_dict.keys()):
                         if len(word) != length:
                             del word_dict[word]
-
             # 随机选一个单词
             word = random.choice(list(word_dict.keys()))
-            global explanation
             explanation = word_dict[word]["中释"]
-
             logger.info(f"选择了{word}单词，长度{length}，释义为{explanation}")
-
-            return word.upper()
+            return {"answer":word.upper(),"word_dict":word_dict,"explanation":explanation}
         
         except Exception as e:
             logger.error(f"加载词表失败: {e!s}")
             return None
-        
-    @command_group("猜单词")  # noqa: F405
-    def wordle(self):
         pass
 
-    @wordle.command("结束")  # type: ignore
-    async def stop_wordle(self, event: AstrMessageEvent):
-        """结束游戏"""
-        session_id = event.unified_msg_origin
-        if session_id not in self.game_sessions:
-            yield event.plain_result("游戏还没开始，输入“/猜单词 开始”来开始游戏吧！")
-            return
-        if session_id in self.game_sessions:
+    @command("猜单词")
+    async def wordle(self, event: AstrMessageEvent):
+        msg = event.get_message_str()
+        if "结束" in msg:
+            """结束游戏"""
+            session_id = event.unified_msg_origin
+            if session_id not in self.game_sessions:
+                yield event.plain_result("游戏还没开始，输入“/猜单词 开始”来开始游戏吧！")
+                return
+            if session_id in self.game_sessions:
+                game = self.game_sessions[session_id]
+                yield event.plain_result(f"猜单词已结束，正确答案是{game.answer}，含义为“{game.explanation}”。")
+                del self.game_sessions[session_id]
+        elif "提示" in msg:
+            """获取提示"""
+            session_id = event.unified_msg_origin
+            if session_id not in self.game_sessions:
+                yield event.plain_result("游戏还没开始，输入“/猜单词 开始”来开始游戏吧！")
+                return
             game = self.game_sessions[session_id]
-            yield event.plain_result(f"猜单词已结束，正确答案是{game.answer}。")
-            del self.game_sessions[session_id]
 
-    @wordle.command("提示")  # type: ignore
-    async def give_hint(self, event: AstrMessageEvent):
-        """获取提示"""
-        session_id = event.unified_msg_origin
-        if session_id not in self.game_sessions:
-            yield event.plain_result("游戏还没开始，输入“/猜单词 开始”来开始游戏吧！")
-            return
-        game = self.game_sessions[session_id]
+            image_result_hint = await game.hint()
+            if image_result_hint:  # 当用户曾猜过正确的字母时，给出图片形式的提示
+                
+                # 保证兼容性（来自原作者），将png转为jpg
+                tem_id = session_id.replace(":","") # 删掉文件系统不兼容的符号
+                img_path_png = os.path.join(
+                    os.path.dirname(os.path.abspath(__file__)),
+                    f"{tem_id}_{len(game.guesses)}_wordle_hint.png",
+                )
+                img_path_jpg = os.path.join(
+                    os.path.dirname(os.path.abspath(__file__)),
+                    f"{tem_id}_{len(game.guesses)}_wordle_hint.jpg",
+                )
 
-        image_result_hint = await game.hint()
+                with open(img_path_png, "wb") as f:
+                    f.write(image_result_hint)
 
-        if not image_result_hint == False:  # 当用户猜出来过正确的字母时，给出图片形式的提示
-            
-            # 保证兼容性（从原作者那偷的），将png转为jpg
-            tem_id = session_id.replace(":","") # 删掉文件系统不兼容的符号
-            img_path_png = os.path.join(
-                os.path.dirname(os.path.abspath(__file__)),
-                f"{tem_id}_{len(game.guesses)}_wordle_hint.png",
-            )
-            img_path_jpg = os.path.join(
-                os.path.dirname(os.path.abspath(__file__)),
-                f"{tem_id}_{len(game.guesses)}_wordle_hint.jpg",
-            )
+                im = ImageW.open(img_path_png)
+                im = im.convert('RGB')
+                im.save(img_path_jpg, quality=95)
 
-            with open(img_path_png, "wb") as f:
-                f.write(image_result_hint)
+                chain = [
+                    Image.fromFileSystem(img_path_jpg),
+                    Plain("这是你已经猜出的字母。")
+                ]
+                yield event.chain_result(chain)
 
-            im = ImageW.open(img_path_png)
-            im = im.convert('RGB')
-            im.save(img_path_jpg, quality=95)
+                os.remove(img_path_png)
+                os.remove(img_path_jpg)
 
-            chain = [
-                Image.fromFileSystem(img_path_jpg),
-                Plain("这是你已经猜出的字母。")
-            ]
-            yield event.chain_result(chain)
-
-            os.remove(img_path_png)
-            os.remove(img_path_jpg)
-
-        else:   # 当用户一个字母都没有猜出来过时，给出文本形式的提示
-            i = random.randint(0,len(game.answer)-1)
-            hint = f"提示：第{i+1}个字母是 {game.answer[i]}。"
-            yield event.plain_result(hint)
-    
-    @wordle.command("开始")  # type: ignore
-    async def start_wordle(self, event: AstrMessageEvent, length = 5):
-        """开始Wordle游戏"""
-        answer = await self.get_answer(length)
-        session_id = event.unified_msg_origin
-        if session_id in self.game_sessions:
-            del self.game_sessions[session_id]
-        if not answer:
-            random_text = random.choice([
-                f"{length}个字母长度的单词，我找不到啊……",
-                f"{length}个字母的单词好像有点稀有哦，换一个吧！",
-                "没找到这么长的单词，换一个吧！"
-            ])
-            yield event.plain_result(random_text)
+            else:   # 当用户一个字母都没有猜出来过时，给出文本形式的提示
+                i = random.randint(0,len(game.answer)-1)
+                hint = f"提示：第{i+1}个字母是 {game.answer[i]}。"
+                yield event.plain_result(hint)
         else:
-            game = WordleGame(answer)
-            self.game_sessions[session_id] = game
-            logger.debug(f"答案是：{answer}")
-            random_text = random.choice([
-                    f"游戏开始！请输入长度为{length}的单词。",
-                    f"游戏开始了！请输入长度为{length}的单词。",
-                    f"游戏开始了！请输入长度为{length}的单词。"
+            """开始Wordle游戏"""
+            session_id = event.unified_msg_origin
+            if session_id in self.game_sessions:
+                del self.game_sessions[session_id]
+            try:
+                length = int(msg.strip("猜单词"))
+            except:
+                length = 5
+            temp = await self.get_answer(length)
+            if not temp:
+                # 如果未能生成一个答案
+                random_text = random.choice([
+                    f"{length}个字母长度的单词，我找不到啊……",
+                    f"{length}个字母的单词好像有点稀有哦，换一个吧！",
+                    "没找到这么长的单词，换一个吧！"
                 ])
-            yield event.plain_result(random_text)
-        pass
+                yield event.plain_result(random_text)
+            else:
+                answer = temp["answer"]
+                word_dict = temp["word_dict"]
+                explanation = temp["explanation"]
+                game = WordleGame(answer,word_dict,explanation)
+                self.game_sessions[session_id] = game
+                logger.debug(f"答案是：{answer}")
+                random_text = random.choice([
+                        f"游戏开始！请输入长度为{length}的单词。",
+                        f"游戏开始了！请输入长度为{length}的单词。",
+                        f"游戏开始了！请输入长度为{length}的单词。"
+                    ])
+                yield event.plain_result(random_text)
+            pass
 
     @event_message_type(EventMessageType.ALL)
     async def on_message(self, event: AstrMessageEvent):
-
         msg = event.get_message_str()
         msg = msg.lower()
         session_id = event.unified_msg_origin
@@ -373,11 +375,10 @@ class PluginWordle(Star):
         if session_id in self.game_sessions and event.is_at_or_wake_command:
             game = self.game_sessions[session_id]
 
-            if "猜单词 开始" in msg or "猜单词 结束" in msg or "猜单词 提示" in msg:
+            if "猜单词" in msg:
                 return
             
             else:
-                
                 length = game.length
                 spellcheck = SpellChecker()
 
@@ -385,19 +386,13 @@ class PluginWordle(Star):
                     random_text = random.choice([
                     "你要输入英语才行啊😉！",
                     "语言不正确哦，要输入英语单词。",
-                    "我以后就可以用其他语言猜单词了，不过现在还是用英语吧！",
                     "Try in English💬!", 
-                    "需要英文单词～🔡",  
-                    "Alphabet Only!🔤", 
-                    "外星挑战：地球英文输入🛸。", 
-                    "符号错误🔣，需要纯字母。", 
-                    "❗Error: Expected ENGLISH :("
                 ])
                     random_text = random_text + "\n输入“/猜单词 结束”就可以结束游戏，输入“/猜单词 提示”可以获得提示。"
                     yield event.plain_result(random_text)
                     return
                 
-                elif len(msg) != length:
+                if not len(msg) == length:
                     random_text = random.choice([
                     f"你要输入{length}字母的英语单词才行啊😉！",
                     f"不太对哦，要输入{length}个字母的英语单词🔡。",
@@ -412,11 +407,9 @@ class PluginWordle(Star):
                     yield event.plain_result(random_text)
                     return   
                     
-                elif not(
-                    msg in list(word_dict.keys())   # 在词表中是否找到用户的输入
+                if not ( msg in list(game.word_dict.keys())   # 在词表中是否找到用户的输入
                     or spellcheck.known((msg,)) # 在拼写检查库中是否找到用户的输入
-                    or (re_spell_check(msg,self.custom_word_list))
-                    ):
+                    or re_spell_check(msg,self.custom_word_list)):
                     random_text = random.choice([
                     "拼写错误😉！",
                     "拼错了哦，试试重新拼一下单词吧！",
@@ -452,15 +445,16 @@ class PluginWordle(Star):
                 ])
                 if random.randint(1,22) == 1:
                     random_text = "🔠🥳语言神，启动🔠🥳！"
-                game_status = f"{random_text}“{game.answer}”的意思是“{explanation}”。"
+                game_status = f"{random_text}“{game.answer}”的意思是“{game.explanation}”。"
                 del self.game_sessions[session_id]
             elif game.is_game_over:
-                game_status = f"没有人猜出答案啊Σ(°△°|||)︴\n正确答案是“{game.answer}”，意思是“{explanation}”。"
+                game_status = f"没有人猜出答案啊Σ(°△°|||)︴\n正确答案是“{game.answer}”，意思是“{game.explanation}”。"
                 del self.game_sessions[session_id]
             else:
                 game_status = f"已猜测 {len(game.guesses)}/{game.max_attempts} 次。"
                 logger.info(f"已猜测 {len(game.guesses)}/{game.max_attempts} 次。")
             
+            # 生成图片
             # 保证兼容性（从原作者那偷的），将png转为jpg
             tem_id = session_id.replace(":","") # 删掉文件系统不兼容的符号
             img_path_png = os.path.join(
