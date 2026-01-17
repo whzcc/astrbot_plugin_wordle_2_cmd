@@ -1,31 +1,33 @@
-# astrbot_plugin_wordle_2_cmd
+# Wordle 猜单词游戏
 
 Forked from [astrbot_plugin_wordle](https://github.com/Raven95676/astrbot_plugin_wordle)
 
-2.2.1：支持配置自定义拼写检查（支持正则表达式）
-
 > [!important]
-> 这个版本响应聊天中的指令。
-> 
-> 如果你需要响应聊天中普通消息的版本，请前往 [astrbot_plugin_wordle_2_msg](https://github.com/whzcc/astrbot_plugin_wordle_2_msg)。
-> 
 > 猜单词时，直接对 Bot 说出单词即可。
 >
-> 这个版本中，你可以使用这些指令（斜杠“/”可根据你的 AstrBot 配置被替换为其他字符）：
+> 你可以使用这些指令：
 > 
 > ```
-> /猜单词 开始 (长度)
+> 开始游戏：/猜单词 (单词长度)
+> 例如：/猜单词 6
 > ```
 > ```
-> /猜单词 提示
+> 获取提示：/猜单词 提示
 > ```
 > ```
-> /猜单词 结束
+> 结束游戏：/猜单词 结束
 > ```
+> 
+> 这个版本响应聊天中的指令。
+> 
+> 如果你需要响应聊天中普通消息的版本，请前往 [astrbot_plugin_wordle_2_msg](https://github.com/whzcc/astrbot_plugin_wordle_2_msg) （即将弃用）。
+>
+
+<img width="1175" height="623" alt="image" src="https://github.com/user-attachments/assets/9ce8f08b-b61d-4dec-9135-0518434df450" />
 
 Astrbot Wordle 游戏，支持指定位数——只需要单词表中存在该长度的单词。
 
-**自定义词库和释义功能**。（修改在 ```/wordlist``` 目录下的 json 文件。这里使用了 [nonebot-plugin-wordle](https://github.com/noneplugin/nonebot-plugin-wordle) 的单词表。）
+**自定义词库和释义功能**。（修改在 ```.xxx.../wordlist``` 目录下的 json 文件。这里使用了 [nonebot-plugin-wordle](https://github.com/noneplugin/nonebot-plugin-wordle) 的单词表。）
 
 **自定义显示字体**。（在 ```main.py``` 里替换 ```MinecraftAE.ttf``` 为所需字体，字体的大小和位置可能也需要调整。）
 
@@ -41,4 +43,7 @@ Astrbot Wordle 游戏，支持指定位数——只需要单词表中存在该�
 
 优化了一些细节。
 
-启动时，插件会自动尝试安装 “pyspellchecker” 库，但建议手动在 AstrBot 目录中 requirements.txt 添加一行 “pyspellchecker”
+启动时，插件会自动尝试安装 “pyspellchecker” 库。
+
+2.2.2: 优化两个可能引发错误的全局变量，修改正则表达式检查可能产生的 Bug。
+2.2.1：支持配置自定义拼写检查（支持正则表达式）
